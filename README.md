@@ -1,13 +1,6 @@
 # API de votação
 
-Implementação simples e segura do [desafio técnico original](README_DESAFIO.md): cadastro de pautas, abertura de sessão, recebimento de votos e contabilização do resultado.
-
-## Documentação para estudo
-
-- [Plano de implementação executado](docs/PLANO_IMPLEMENTACAO.md)
-- [Decisões técnicas e guia de estudo](docs/DECISOES_TECNICAS_E_GUIA_DE_ESTUDO.md)
-
-Esses documentos registram o que foi implementado, as alternativas consideradas, os resultados das validações e como a IA apoiou o processo sem substituir a revisão técnica.
+Implementação simples e segura do [desafio técnico original](README_DESAFIO.md): cadastro de pautas, abertura de sessão, recebimento de votos, elegibilidade por CPF e contabilização do resultado.
 
 ## Escolhas principais
 
@@ -67,6 +60,16 @@ curl -i -X POST http://localhost:8080/api/v1/pautas/PAUTA_ID/votos \
   -d '{"associadoId":"associado-123","opcao":"SIM"}'
 ```
 
+O registro V2 interpreta `associadoId` como CPF, aceita o valor com ou sem pontuação, valida os dígitos verificadores e consulta a elegibilidade aleatória antes de registrar o voto:
+
+```bash
+curl -i -X POST http://localhost:8080/api/v2/pautas/PAUTA_ID/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"associadoId":"529.982.247-25","opcao":"SIM"}'
+```
+
+CPF inválido retorna `404` com o código `CPF_INVALIDO`. Um CPF válido sorteado como não habilitado retorna `403` com `UNABLE_TO_VOTE`. Quando habilitado, o CPF é persistido normalizado, contendo somente os 11 dígitos. A V1 foi preservada para compatibilidade e continua tratando `associadoId` como identificador textual.
+
 Consultar resultado parcial ou final:
 
 ```bash
@@ -79,6 +82,7 @@ curl http://localhost:8080/api/v1/pautas/PAUTA_ID/resultado
 - A sessão abre imediatamente e aceita duração positiva; o padrão é 60 segundos.
 - O intervalo de votação é `abertaEm <= instante < fechaEm`.
 - Cada `associadoId` vota uma única vez por pauta.
+- Na V2, `associadoId` deve ser um CPF válido e o associado precisa ser sorteado como `ABLE_TO_VOTE`.
 - Restrições `UNIQUE` no PostgreSQL garantem as regras mesmo sob requisições concorrentes.
 - O resultado é `EM_ANDAMENTO` enquanto a sessão está aberta e, depois, `APROVADA`, `REJEITADA` ou `EMPATE`.
 - Erros usam o formato padronizado RFC 9457 (`application/problem+json`).
@@ -99,6 +103,12 @@ Com Java 21 local:
 ```
 
 O build falha se linhas ou branches ficarem abaixo de 90%. O relatório HTML fica em `target/site/jacoco/index.html`.
+
+### Como a aleatoriedade é testada
+
+A V2 depende da interface `ConsultaElegibilidade`, não diretamente do gerador aleatório. Em produção, `ConsultaElegibilidadeFake` usa `SecureRandom`. Nos testes unitários, o gerador e a interface são mocks com respostas controladas; no teste integrado, uma implementação `@Primary` sempre retorna `ABLE_TO_VOTE`. Assim os dois resultados do sorteio são testados sem repetição, seed global ou possibilidade de falha intermitente.
+
+A validação dos dígitos verificadores foi implementada em uma classe pequena de domínio (`Cpf`). Uma biblioteca adicional não traria benefício proporcional para esse algoritmo estável e aumentaria dependências, superfície de atualização e tempo de build.
 
 ## SonarQube
 
@@ -128,8 +138,8 @@ O scanner aguarda o quality gate e retorna erro se ele não for aprovado.
 
 ## Decisões e limites intencionais
 
-- `associadoId` é um identificador textual opaco. O enunciado não define CPF nem um cadastro de associados, portanto essa regra não foi inventada.
+- Na V1, `associadoId` permanece textual e opaco; na V2, ele representa um CPF, conforme o bônus de integração externa.
 - Resultados parciais são retornados para tornar a API observável; o estado informa claramente `EM_ANDAMENTO`.
-- Autenticação, mensageria e serviços externos foram deixados fora: não são exigidos pelo contrato e aumentariam a complexidade sem resolver uma regra do desafio.
+- Autenticação e mensageria foram deixadas fora. A elegibilidade é uma porta local com adapter fake aleatório, pronta para receber um client externo real sem alterar o fluxo da V2.
 - As entidades ficam dentro de cada funcionalidade e controllers dependem de services, que dependem de repositories. Essa separação aplica responsabilidade única e inversão de dependência sem criar camadas artificiais.
 - Repository substitui DAOs manuais; DTOs separam o contrato HTTP das entidades; injeção de `Clock` torna regras temporais determinísticas nos testes.

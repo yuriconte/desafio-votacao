@@ -35,6 +35,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import br.com.somosdb.votacao.pauta.PautaRepository;
 import br.com.somosdb.votacao.pauta.dto.CriarPautaRequest;
 import br.com.somosdb.votacao.pauta.dto.PautaResponse;
+import br.com.somosdb.votacao.elegibilidade.ConsultaElegibilidade;
+import br.com.somosdb.votacao.elegibilidade.StatusElegibilidade;
 import br.com.somosdb.votacao.resultado.Resultado;
 import br.com.somosdb.votacao.resultado.dto.ResultadoResponse;
 import br.com.somosdb.votacao.sessao.SessaoRepository;
@@ -171,6 +173,23 @@ class VotacaoApplicationIT {
         assertThat(response.getBody()).contains("SESSAO_JA_EXISTE");
     }
 
+    @Test
+    void deveRegistrarVotoV2ComCpfNormalizadoEElegibilidadeDeterministica() {
+        PautaResponse pauta = criarPauta("Elegibilidade por CPF");
+        abrirSessao(pauta.id(), 60L);
+
+        ResponseEntity<VotoResponse> response = restTemplate.postForEntity(
+                "/api/v2/pautas/{id}/votos",
+                Map.of("associadoId", "529.982.247-25", "opcao", "SIM"),
+                VotoResponse.class,
+                pauta.id());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().associadoId()).isEqualTo("52998224725");
+        assertThat(votoRepository.count()).isEqualTo(1);
+    }
+
     private PautaResponse criarPauta(String titulo) {
         ResponseEntity<PautaResponse> response = restTemplate.postForEntity(
                 "/api/v1/pautas",
@@ -210,6 +229,12 @@ class VotacaoApplicationIT {
         @Primary
         MutableClock mutableClock() {
             return new MutableClock(INICIO);
+        }
+
+        @Bean
+        @Primary
+        ConsultaElegibilidade consultaElegibilidade() {
+            return cpf -> StatusElegibilidade.ABLE_TO_VOTE;
         }
     }
 

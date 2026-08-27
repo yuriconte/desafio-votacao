@@ -34,14 +34,23 @@ import br.com.somosdb.votacao.sessao.SessaoController;
 import br.com.somosdb.votacao.sessao.SessaoService;
 import br.com.somosdb.votacao.sessao.StatusSessao;
 import br.com.somosdb.votacao.sessao.dto.SessaoResponse;
+import br.com.somosdb.votacao.shared.error.AssociadoNaoPodeVotarException;
 import br.com.somosdb.votacao.shared.error.RecursoNaoEncontradoException;
 import br.com.somosdb.votacao.shared.error.RegraNegocioException;
 import br.com.somosdb.votacao.voto.OpcaoVoto;
 import br.com.somosdb.votacao.voto.VotoController;
 import br.com.somosdb.votacao.voto.VotoService;
+import br.com.somosdb.votacao.voto.VotoV2Controller;
+import br.com.somosdb.votacao.voto.VotoV2Service;
 import br.com.somosdb.votacao.voto.dto.VotoResponse;
 
-@WebMvcTest({PautaController.class, SessaoController.class, VotoController.class, ResultadoController.class})
+@WebMvcTest({
+        PautaController.class,
+        SessaoController.class,
+        VotoController.class,
+        VotoV2Controller.class,
+        ResultadoController.class
+})
 class ApiControllerTest {
 
     private static final UUID PAUTA_ID = UUID.fromString("c073f00d-a450-45d9-bc08-9a1713a35de3");
@@ -59,6 +68,9 @@ class ApiControllerTest {
 
     @MockitoBean
     private VotoService votoService;
+
+    @MockitoBean
+    private VotoV2Service votoV2Service;
 
     @MockitoBean
     private ResultadoService resultadoService;
@@ -125,6 +137,44 @@ class ApiControllerTest {
                         .content("{\"associadoId\":\"associado-1\",\"opcao\":\"TALVEZ\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("JSON_INVALIDO"));
+    }
+
+    @Test
+    void deveRegistrarVotoV2ComCpf() throws Exception {
+        when(votoV2Service.registrar(eq(PAUTA_ID), any())).thenReturn(new VotoResponse(
+                RECURSO_ID, PAUTA_ID, "52998224725", OpcaoVoto.SIM, AGORA));
+
+        mockMvc.perform(post("/api/v2/pautas/{id}/votos", PAUTA_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"associadoId\":\"529.982.247-25\",\"opcao\":\"SIM\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.associadoId").value("52998224725"))
+                .andExpect(jsonPath("$.opcao").value("SIM"));
+    }
+
+    @Test
+    void deveRetornarNotFoundParaCpfInvalidoNaV2() throws Exception {
+        when(votoV2Service.registrar(eq(PAUTA_ID), any())).thenThrow(
+                new RecursoNaoEncontradoException("CPF_INVALIDO", "CPF inválido"));
+
+        mockMvc.perform(post("/api/v2/pautas/{id}/votos", PAUTA_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"associadoId\":\"11111111111\",\"opcao\":\"SIM\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("CPF_INVALIDO"));
+    }
+
+    @Test
+    void deveRetornarForbiddenParaAssociadoNaoHabilitadoNaV2() throws Exception {
+        when(votoV2Service.registrar(eq(PAUTA_ID), any())).thenThrow(
+                new AssociadoNaoPodeVotarException());
+
+        mockMvc.perform(post("/api/v2/pautas/{id}/votos", PAUTA_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"associadoId\":\"52998224725\",\"opcao\":\"SIM\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("UNABLE_TO_VOTE"))
+                .andExpect(jsonPath("$.detail").value("O associado não está habilitado para votar"));
     }
 
     @Test

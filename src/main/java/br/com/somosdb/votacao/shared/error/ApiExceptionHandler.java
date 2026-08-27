@@ -32,6 +32,13 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.CONFLICT, exception.getCodigo(), exception.getMessage(), request);
     }
 
+    @ExceptionHandler(AssociadoNaoPodeVotarException.class)
+    ResponseEntity<ProblemDetail> handleUnableToVote(
+            AssociadoNaoPodeVotarException exception,
+            HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "UNABLE_TO_VOTE", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ProblemDetail> handleDataIntegrity(HttpServletRequest request) {
         return problem(
@@ -105,4 +112,3 @@ public class ApiExceptionHandler {
     record Violacao(String campo, String mensagem) {
     }
 }
-
