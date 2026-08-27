@@ -13,4 +13,5 @@ target
 .env
 .scannerwork
 .sonar
+performance-results
 README_DESAFIO.md

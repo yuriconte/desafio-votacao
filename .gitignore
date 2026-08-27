@@ -23,6 +23,7 @@ application-local.properties
 # Local analysis data
 .scannerwork/
 .sonar/
+performance-results/
 
 # Local technical study documentation
 docs/

@@ -1,0 +1,57 @@
+name: desafio-votacao-performance
+
+services:
+  perf-db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: votacao_performance
+      POSTGRES_USER: votacao_performance
+      POSTGRES_PASSWORD: votacao_performance_local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - perf-db-data:/var/lib/postgresql/data
+
+  perf-app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://perf-db:5432/votacao_performance
+      SPRING_DATASOURCE_USERNAME: votacao_performance
+      SPRING_DATASOURCE_PASSWORD: votacao_performance_local
+    depends_on:
+      perf-db:
+        condition: service_healthy
+
+  k6:
+    image: grafana/k6:2.2.0
+    environment:
+      BASE_URL: http://perf-app:8080
+      PERF_PROFILE: ${PERF_PROFILE:-smoke}
+      PERF_RUN_ID: ${PERF_RUN_ID:-manual-smoke}
+      PERF_RATE: ${PERF_RATE:-100}
+      PERF_DURATION: ${PERF_DURATION:-2m}
+      PERF_TOTAL_VOTES: ${PERF_TOTAL_VOTES:-200000}
+      PERF_VUS: ${PERF_VUS:-100}
+      PERF_PREALLOCATED_VUS: ${PERF_PREALLOCATED_VUS:-100}
+      K6_WEB_DASHBOARD: "true"
+      K6_WEB_DASHBOARD_HOST: 0.0.0.0
+      K6_WEB_DASHBOARD_PORT: 5665
+      K6_WEB_DASHBOARD_PERIOD: 1s
+      K6_WEB_DASHBOARD_EXPORT: /results/${PERF_RUN_ID:-manual-smoke}/report.html
+    ports:
+      - "5665:5665"
+    volumes:
+      - ./performance:/scripts:ro
+      - ./performance-results:/results
+    depends_on:
+      perf-app:
+        condition: service_healthy
+    command: ["run", "/scripts/voting.js"]
+
+volumes:
+  perf-db-data:
