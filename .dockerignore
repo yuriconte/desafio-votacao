@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+.agents
+.skills
+.codex
+agents
+skills
+docs
+target
+*.log
+.env
+.scannerwork
+.sonar
+README_DESAFIO.md

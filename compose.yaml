@@ -1,0 +1,81 @@
+services:
+  app-db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: ${APP_DB_NAME:-votacao}
+      POSTGRES_USER: ${APP_DB_USER:-votacao}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-votacao_local}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://app-db:5432/${APP_DB_NAME:-votacao}
+      SPRING_DATASOURCE_USERNAME: ${APP_DB_USER:-votacao}
+      SPRING_DATASOURCE_PASSWORD: ${APP_DB_PASSWORD:-votacao_local}
+    ports:
+      - "8080:8080"
+    depends_on:
+      app-db:
+        condition: service_healthy
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test-runner
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - maven-cache:/root/.m2
+
+  sonar-db:
+    profiles: ["quality"]
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: ${SONAR_DB_NAME:-sonar}
+      POSTGRES_USER: ${SONAR_DB_USER:-sonar}
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:-sonar_local}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - sonar-db-data:/var/lib/postgresql/data
+
+  sonarqube:
+    profiles: ["quality"]
+    image: sonarqube:26.8.0.126808-community
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/${SONAR_DB_NAME:-sonar}
+      SONAR_JDBC_USERNAME: ${SONAR_DB_USER:-sonar}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:-sonar_local}
+    ports:
+      - "9000:9000"
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-logs:/opt/sonarqube/logs
+      - sonar-extensions:/opt/sonarqube/extensions
+
+volumes:
+  app-db-data:
+  maven-cache:
+  sonar-db-data:
+  sonar-data:
+  sonar-logs:
+  sonar-extensions:

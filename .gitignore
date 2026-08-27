@@ -1,0 +1,38 @@
+# Build output
+target/
+*.log
+
+# IDEs and operating system
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# Local analysis data
+.scannerwork/
+.sonar/
+
+# Local technical study documentation
+docs/
+
+# AI agent instructions and local skills
+AGENTS.md
+**/AGENTS.md
+.agents/
+agents/
+.skills/
+skills/
+.codex/
+CLAUDE.md
