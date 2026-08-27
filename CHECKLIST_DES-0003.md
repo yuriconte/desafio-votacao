@@ -78,6 +78,8 @@ Precisamos confirmar:
 
 ## Callbacks
 
-❌ Não implementados porque o enunciado não define nenhum fluxo de callback.
+➖ Não se aplicam isoladamente ao backend entregue.
 
-Precisamos confirmar quais eventos geram callbacks, destino, payload, autenticação, timeout e política de retry. Também é necessário esclarecer se a referência a “domínio das URLs de callback” trata de callbacks do backend ou apenas das URLs de ação enviadas ao aplicativo.
+Pelo contexto do Anexo 1, “callbacks” são as URLs de ação incluídas nos botões e itens das telas server-driven `FORMULARIO` e `SELECAO`, chamadas pelo aplicativo após a interação do usuário. Não são webhooks enviados pelo backend para sistemas externos.
+
+Como o contrato mobile server-driven ficou fora do escopo desta entrega, não há callbacks independentes a implementar. Criar configuração de domínio, retry, autenticação de webhook ou mensageria sem essas telas produziria código sem uso e contrariaria a orientação de evitar overengineering. Se o contrato mobile for implementado futuramente, o domínio das URLs de ação deverá ser configurável por ambiente para atender emulador, dispositivo físico e produção.
